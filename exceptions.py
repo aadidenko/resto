@@ -42,6 +42,10 @@ class HttpNotFound(RestoResponseError):
     response_class = http.HttpNotFound
 
 
+class HttpMethodNotAllowed(RestoResponseError):
+    response_class = http.HttpMethodNotAllowed
+
+
 class HttpUnprocessableEntity(RestoResponseError):
     response_class = http.HttpUnprocessableEntity
 
