@@ -16,10 +16,13 @@ class BaseRESTHandler(RequestHandler):
     serializer = serializers.JSONSerializer()
 
     def _response(self, response):
+        if self._finished:
+            return
+
         self._headers = response.headers
         self.set_status(response.code)
         meta = self._response_meta(error_message=response.error_message)
-        data = response._body
+        data = response._body or None
         self.finish({
             'meta': meta,
             'response': data
@@ -38,26 +41,62 @@ class BaseRESTHandler(RequestHandler):
 
         return meta
 
+    def _execute(self, transforms, *args, **kwargs):
+        """Executes this request with the given output transforms."""
+        self._transforms = transforms
+        try:
+
+            self.path_args = [self.decode_argument(arg) for arg in args]
+            self.path_kwargs = dict((k, self.decode_argument(v, name=k))
+                                    for (k, v) in kwargs.items())
+
+            self.dispatch(self.request.method, **kwargs)
+        except Exception as e:
+            self._handle_request_exception(e)
+
+    def _handle_request_exception(self, e):
+        self.log_exception(*sys.exc_info())
+
+        if self._finished:
+            return
+
+        if isinstance(e, exceptions.RestoError):
+            response = getattr(e, 'response', None)
+            if response is not None:
+                self._response(response)
+        else:
+            response = http.HttpApplicationError(self.request)
+
+            if self.settings.get("debug"):
+                import traceback
+                self.set_status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR)
+                self.set_header('Content-Type', 'text/plain')
+                for line in traceback.format_exception(*sys.exc_info()):
+                    self.write(line)
+                self.finish()
+            else:
+                self._response(response)
+
+    def log_exception(self, typ, value, tb):
+        # TODO
+        # Logging exception
+        pass
+
     def write(self, chunk):
         if self._finished:
             raise RuntimeError("Cannot write() after finish().  May be caused "
                                "by using async operations without the "
                                "@asynchronous decorator.")
+
         if isinstance(chunk, dict):
             chunk = self.serializer.serialize(chunk)
-            self.set_header("Content-Type", "application/json; charset=UTF-8")
+            self.set_header("Content-Type", self.serializer.get_content_type())
+
         chunk = utf8(chunk)
+
         self._write_buffer.append(chunk)
 
     def set_status(self, status_code, reason=None):
-        """Sets the status code for our response.
-
-        :arg int status_code: Response status code. If ``reason`` is ``None``,
-            it must be present in `httplib.responses <http.client.responses>`.
-        :arg string reason: Human-readable reason phrase describing the status
-            code. If ``None``, it will be filled in from
-            `httplib.responses <http.client.responses>`.
-        """
         self._status_code = status_code
         if reason is not None:
             self._reason = escape.native_str(reason)
@@ -68,94 +107,58 @@ class BaseRESTHandler(RequestHandler):
                 raise ValueError("unknown status code %d", status_code)
 
     def head(self, *args, **kwargs):
-        self.wrap_dispatch(request_method='head', **kwargs)
+        raise exceptions.HttpMethodNotAllowed(self.request)
 
     def options(self, *args, **kwargs):
-        self.wrap_dispatch(request_method='options', **kwargs)
+        raise exceptions.HttpMethodNotAllowed(self.request)
 
     def get(self, *args, **kwargs):
-        self.wrap_dispatch(request_method='get', **kwargs)
+        raise exceptions.HttpMethodNotAllowed(self.request)
 
     def post(self, *args, **kwargs):
-        self.wrap_dispatch(request_method='post', **kwargs)
+        raise exceptions.HttpMethodNotAllowed(self.request)
 
     def put(self, *args, **kwargs):
-        self.wrap_dispatch(request_method='put', **kwargs)
+        raise exceptions.HttpMethodNotAllowed(self.request)
 
     def patch(self, *args, **kwargs):
-        self.wrap_dispatch(request_method='patch', **kwargs)
+        raise exceptions.HttpMethodNotAllowed(self.request)
 
     def delete(self, *args, **kwargs):
-        self.wrap_dispatch(request_method='delete', **kwargs)
+        raise exceptions.HttpMethodNotAllowed(self.request)
 
-    def wrap_dispatch(self, **kwargs):
-        try:
-            response = self.dispatch(**kwargs)
-        except exceptions.HttpApplicationError:
-            response = http.HttpApplicationError(self.request)
-
-            if self.settings.get("debug"):
-                import traceback
-                self.set_status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-                self.set_header('Content-Type', 'text/plain')
-                for line in traceback.format_exception(*sys.exc_info()):
-                    self.write(line)
-                self.finish()
-            else:
-                self._response(response)
-        except exceptions.RestoError as e:
-            response = getattr(e, 'response', None)
-            if response is not None:
-                self._response(response)
-        except Exception:
-            response = http.HttpApplicationError(self.request)
-
-            if self.settings.get("debug"):
-                import traceback
-                self.set_status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-                self.set_header('Content-Type', 'text/plain')
-                for line in traceback.format_exception(*sys.exc_info()):
-                    self.write(line)
-                self.finish()
-            else:
-                self._response(response)
-        else:
-            self._response(response)
-
-    def dispatch(self, request_method, **kwargs):
+    def dispatch(self, request_method, *args, **kwargs):
         method = self.method_check(request_method)
 
-        dispatch_func = getattr(self, 'dispatch_%s' % method, None)
-
-        if dispatch_func is None:
+        func = getattr(self, method, None)
+        if func is None:
             raise exceptions.ImmediateHttpResponse(
                 response=http.HttpNotImplemented(self.request)
             )
 
         self.is_authenticated()
 
-        # TODO
-        # self.throttle_check()
+        self.throttle_check()
 
-        response = dispatch_func(**kwargs)
+        response = func(**kwargs)
 
-        # TODO
-        # self.log_throttle_access()
+        self.log_throttle_access()
 
         if isinstance(response, http.HttpResponse):
-            return response
-        elif isinstance(response, dict):
-            return self.create_http_response(response)
+            self._response(response)
         else:
-            return http.HttpNoContent(self.request)
+            self._response(self.create_http_response(response))
 
     def create_http_response(self, data, response_class=http.HttpResponse):
         response = response_class(self.request)
         response._body = data
+        if data is None:
+            response.code = http.HTTP_STATUS_NO_CONTENT
         return response
 
     def method_check(self, method):
         method = method.lower()
+
         allowed_methods = [meth.lower() for meth in self.allowed_methods]
         allows = ','.join(meth.upper() for meth in allowed_methods)
 
@@ -164,7 +167,8 @@ class BaseRESTHandler(RequestHandler):
             response.headers['Allow'] = allows
             raise exceptions.ImmediateHttpResponse(response=response)
 
-        if not method in allowed_methods:
+        if method not in self.SUPPORTED_METHODS and \
+                not method in allowed_methods:
             response = http.HttpMethodNotAllowed(self.request)
             response.headers['Allow'] = allows
             raise exceptions.ImmediateHttpResponse(response=response)
@@ -179,31 +183,18 @@ class BaseRESTHandler(RequestHandler):
                 response=http.HttpUnauthorized(self.request)
             )
         else:
-            self.user = user
+            self.current_user = user
 
     def serialize(self, data):
         return self.serializer.serialize(data)
 
-    def dispatch_head(self, *args, **kwargs):
-        return http.HttpMethodNotAllowed(self.request)
+    def throttle_check(self):
+        # TODO
+        pass
 
-    def dispatch_options(self, *args, **kwargs):
-        return http.HttpMethodNotAllowed(self.request)
-
-    def dispatch_get(self, *args, **kwargs):
-        return http.HttpMethodNotAllowed(self.request)
-
-    def dispatch_post(self, *args, **kwargs):
-        return http.HttpMethodNotAllowed(self.request)
-
-    def dispatch_put(self, *args, **kwargs):
-        return http.HttpMethodNotAllowed(self.request)
-
-    def dispatch_patch(self, *args, **kwargs):
-        return http.HttpMethodNotAllowed(self.request)
-
-    def dispatch_delete(self, *args, **kwargs):
-        return http.HttpMethodNotAllowed(self.request)
+    def log_throttle_access(self):
+        # TODO
+        pass
 
 
 class RESTHandler(BaseRESTHandler):

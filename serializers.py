@@ -5,6 +5,11 @@ from resto.encoders import JSONEncoder
 
 
 class JSONSerializer(object):
+    content_type = "application/json"
+    encoding = "UTF-8"
+
+    def get_content_type(self):
+        return "{}; charset={}".format(self.content_type, self.encoding)
 
     def serialize(self, data):
         return self.to_json(data)
@@ -15,10 +20,7 @@ class JSONSerializer(object):
         )
 
 
-class CamelCaseJSONSerializer(object):
-
-    def serialize(self, data):
-        return self.to_json(data)
+class CamelCaseJSONSerializer(JSONSerializer):
 
     def to_json(self, data, options=None):
         def underscoreToCamel(match):
