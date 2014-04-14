@@ -25,11 +25,11 @@ class HttpResponse(tornado.httpclient.HTTPResponse):
     code = HTTP_STATUS_OK
     error_message = None
 
-    def __init__(self, request, *args, **kwargs):
+    def __init__(self, request, data=None, *args, **kwargs):
         url = getattr(request, 'url', request.uri)
         setattr(request, 'url', url)
-        super(HttpResponse, self).__init__(request, self.code)
-        self.error_message = kwargs.pop('error_message', None)
+        super(HttpResponse, self).__init__(request, self.code, *args, **kwargs)
+        self._body = data
 
 
 class HttpCreated(HttpResponse):

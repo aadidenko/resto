@@ -12,6 +12,7 @@ from resto import httputil
 
 class BaseRESTHandler(RequestHandler):
     allowed_methods = []
+    missing_params = {}
     authentication = auth.Authentication()
     serializer = serializers.JSONSerializer()
 
@@ -21,25 +22,7 @@ class BaseRESTHandler(RequestHandler):
 
         self._headers = response.headers
         self.set_status(response.code)
-        meta = self._response_meta(error_message=response.error_message)
-        data = response._body or None
-        self.finish({
-            'meta': meta,
-            'response': data
-        })
-
-    def _response_meta(self, **kwargs):
-        meta = {
-            'status': self.get_status(),
-        }
-
-        if self.get_status() >= 400:
-            error_message = kwargs.pop('error_message', None)
-            meta['error'] = self._reason
-            if error_message is not None:
-                meta['message'] = error_message
-
-        return meta
+        self.finish(response._body)
 
     def _execute(self, transforms, *args, **kwargs):
         """Executes this request with the given output transforms."""
@@ -136,6 +119,8 @@ class BaseRESTHandler(RequestHandler):
                 response=http.HttpNotImplemented(self.request)
             )
 
+        self.check_missing_params(request_method)
+
         self.is_authenticated()
 
         self.throttle_check()
@@ -152,9 +137,22 @@ class BaseRESTHandler(RequestHandler):
     def create_http_response(self, data, response_class=http.HttpResponse):
         response = response_class(self.request)
         response._body = data
-        if data is None:
-            response.code = http.HTTP_STATUS_NO_CONTENT
         return response
+
+    def check_missing_params(self, request_method):
+        try:
+            params = self.missing_params[request_method.lower()]
+        except KeyError:
+            params = None
+
+        if params is not None:
+            for missing_param in params:
+                has_param = self.get_argument(missing_param, None, True)
+                if has_param is None:
+                    raise exceptions.MissingParamError(
+                        self.request, missing_param)
+
+        return True
 
     def method_check(self, method):
         method = method.lower()

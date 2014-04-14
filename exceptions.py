@@ -7,7 +7,7 @@ class RestoError(Exception):
 
 
 class ImmediateHttpResponse(RestoError):
-    def __init__(self, response):
+    def __init__(self, response, data=None):
         self._response = response
 
     @property
@@ -18,8 +18,8 @@ class ImmediateHttpResponse(RestoError):
 class RestoResponseError(RestoError):
     response_class = http.HttpResponse
 
-    def __init__(self, request, **kwargs):
-        self._response = self.response_class(request, **kwargs)
+    def __init__(self, request, data=None, **kwargs):
+        self._response = self.response_class(request, data, **kwargs)
 
     @property
     def response(self):
@@ -54,11 +54,10 @@ class HttpApplicationError(RestoResponseError):
     response_class = http.HttpApplicationError
 
 
-class MissingParamError(HttpBadRequest):
+class MissingParamError(HttpUnprocessableEntity):
     def __init__(self, request, param_name, *args, **kwargs):
-        super(MissingParamError, self).__init__(request, *args, **kwargs)
-        setattr(
-            self._response,
-            'error_message',
-            "Missing `{}` param".format(param_name)
-        )
+        error_data = {
+            'message': "Missing `{}` param".format(param_name)
+        }
+        super(MissingParamError, self)\
+            .__init__(request, error_data, *args, **kwargs)
