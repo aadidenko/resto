@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+import logging
 from tornado import escape
 from tornado.escape import utf8
 from tornado.web import RequestHandler
@@ -8,6 +9,9 @@ from resto import http
 from resto import auth
 from resto import serializers
 from resto import httputil
+
+
+logger = logging.getLogger('resto.handlers')
 
 
 class BaseRESTHandler(RequestHandler):
@@ -38,7 +42,7 @@ class BaseRESTHandler(RequestHandler):
             self._handle_request_exception(e)
 
     def _handle_request_exception(self, e):
-        self.log_exception(*sys.exc_info())
+        self.log_exception(e, *sys.exc_info())
 
         if self._finished:
             return
@@ -60,10 +64,10 @@ class BaseRESTHandler(RequestHandler):
             else:
                 self._response(response)
 
-    def log_exception(self, typ, value, tb):
+    def log_exception(self, e, typ, value, tb):
         # TODO
         # Logging exception
-        pass
+        logger.error(e)
 
     def write(self, chunk):
         if self._finished:

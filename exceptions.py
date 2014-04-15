@@ -25,6 +25,9 @@ class RestoResponseError(RestoError):
     def response(self):
         return self._response
 
+    def __str__(self):
+        return str(self._response._body)
+
 
 class HttpBadRequest(RestoResponseError):
     response_class = http.HttpBadRequest
