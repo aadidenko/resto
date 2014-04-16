@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import sys
 import logging
+
 from tornado import escape
 from tornado.escape import utf8
 from tornado.web import RequestHandler
+
 from resto import exceptions
 from resto import http
 from resto import auth
@@ -55,6 +57,7 @@ class BaseRESTHandler(RequestHandler):
 
             if self.settings.get("debug"):
                 import traceback
+
                 self.set_status(http.HTTP_STATUS_INTERNAL_SERVER_ERROR)
                 self.set_header('Content-Type', 'text/plain')
                 for line in traceback.format_exception(*sys.exc_info()):

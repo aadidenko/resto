@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 import json
+
 from resto.encoders import JSONEncoder
 
 
@@ -21,7 +22,6 @@ class JSONSerializer(object):
 
 
 class CamelCaseJSONSerializer(JSONSerializer):
-
     def to_json(self, data, options=None):
         def underscoreToCamel(match):
             return match.group()[0] + match.group()[2].upper()

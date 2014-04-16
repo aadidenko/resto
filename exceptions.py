@@ -62,5 +62,5 @@ class MissingParamError(HttpUnprocessableEntity):
         error_data = {
             'message': "Missing `{}` param".format(param_name)
         }
-        super(MissingParamError, self)\
+        super(MissingParamError, self) \
             .__init__(request, error_data, *args, **kwargs)
