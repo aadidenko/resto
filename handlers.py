@@ -16,7 +16,6 @@ logger = logging.getLogger('resto.handlers')
 
 class BaseRESTHandler(RequestHandler):
     allowed_methods = []
-    missing_params = {}
     authentication = auth.Authentication()
     serializer = serializers.JSONSerializer()
 
@@ -123,8 +122,6 @@ class BaseRESTHandler(RequestHandler):
                 response=http.HttpNotImplemented(self.request)
             )
 
-        self.check_missing_params(request_method)
-
         self.is_authenticated()
 
         self.throttle_check()
@@ -142,21 +139,6 @@ class BaseRESTHandler(RequestHandler):
         response = response_class(self.request)
         response._body = data
         return response
-
-    def check_missing_params(self, request_method):
-        try:
-            params = self.missing_params[request_method.lower()]
-        except KeyError:
-            params = None
-
-        if params is not None:
-            for missing_param in params:
-                has_param = self.get_argument(missing_param, None, True)
-                if has_param is None:
-                    raise exceptions.MissingParamError(
-                        self.request, missing_param)
-
-        return True
 
     def method_check(self, method):
         method = method.lower()
