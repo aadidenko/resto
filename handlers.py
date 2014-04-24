@@ -77,7 +77,7 @@ class BaseRESTHandler(RequestHandler):
                                "by using async operations without the "
                                "@asynchronous decorator.")
 
-        if isinstance(chunk, dict):
+        if isinstance(chunk, dict) or isinstance(chunk, list):
             chunk = self.serializer.serialize(chunk)
             self.set_header("Content-Type", self.serializer.get_content_type())
 
