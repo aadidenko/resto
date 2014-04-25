@@ -21,6 +21,10 @@ class BaseRESTHandler(RequestHandler):
     authentication = auth.Authentication()
     serializer = serializers.JSONSerializer()
 
+    def __init__(self, *args, **kwargs):
+        super(BaseRESTHandler, self).__init__(*args, **kwargs)
+        self.current_user = None
+
     def _response(self, response):
         if self._finished:
             return
