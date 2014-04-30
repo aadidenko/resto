@@ -170,6 +170,7 @@ class BaseRESTHandler(RequestHandler):
         is_auth, user = self.authentication.is_authenticated(self.request)
 
         if not is_auth:
+            self.current_user = None
             raise exceptions.ImmediateHttpResponse(
                 response=http.HttpUnauthorized(self.request)
             )
