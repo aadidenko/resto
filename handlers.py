@@ -29,7 +29,9 @@ class BaseRESTHandler(RequestHandler):
         if self._finished:
             return
 
-        self._headers = response.headers
+        for header, value in response.headers.iteritems():
+            self.set_header(header, value)
+
         self.set_status(response.code)
         self.finish(response._body)
 
