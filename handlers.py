@@ -29,9 +29,6 @@ class BaseRESTHandler(RequestHandler):
         if self._finished:
             return
 
-        for header, value in response.headers.iteritems():
-            self.set_header(header, value)
-
         self.set_status(response.code)
         self.finish(response._body)
 
@@ -71,6 +68,9 @@ class BaseRESTHandler(RequestHandler):
                 self.finish()
             else:
                 self._response(response)
+
+    def set_default_headers(self):
+        self.set_header('Content-Type', 'application/json; charset=UTF-8')
 
     def log_exception(self, e, typ, value, tb):
         # TODO
@@ -157,13 +157,13 @@ class BaseRESTHandler(RequestHandler):
 
         if method == 'options':
             response = http.HttpResponse(self.request)
-            response.headers['Allow'] = allows
+            self.set_header('Allow', allows)
             raise exceptions.ImmediateHttpResponse(response=response)
 
         if method not in self.SUPPORTED_METHODS and \
                 not method in allowed_methods:
             response = http.HttpMethodNotAllowed(self.request)
-            response.headers['Allow'] = allows
+            self.set_header('Allow', allows)
             raise exceptions.ImmediateHttpResponse(response=response)
 
         return method
