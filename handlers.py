@@ -46,7 +46,7 @@ class BaseRESTHandler(RequestHandler):
             self._handle_request_exception(e)
 
     def _handle_request_exception(self, e):
-        self.log_exception(e, *sys.exc_info())
+        self.log_exception(*sys.exc_info())
 
         if self._finished:
             return
@@ -71,11 +71,6 @@ class BaseRESTHandler(RequestHandler):
 
     def set_default_headers(self):
         self.set_header('Content-Type', 'application/json; charset=UTF-8')
-
-    def log_exception(self, e, typ, value, tb):
-        # TODO
-        # Logging exception
-        logger.error(e)
 
     def write(self, chunk):
         if self._finished:
