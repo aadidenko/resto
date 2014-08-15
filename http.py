@@ -42,6 +42,10 @@ class HttpCreated(HttpResponse):
             self.headers['Location'] = location
 
 
+class HttpOk(HttpResponse):
+    code = HTTP_STATUS_OK
+
+
 class HttpAccepted(HttpResponse):
     code = HTTP_STATUS_ACCEPTED
 
